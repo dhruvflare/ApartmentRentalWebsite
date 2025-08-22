@@ -19,10 +19,8 @@ staticfiles/
 *.pgdata
 
 # Virtualenvs
-venv/
 env/
 ENV/
-.virtualenv/
 
 # IDE settings
 .idea/
