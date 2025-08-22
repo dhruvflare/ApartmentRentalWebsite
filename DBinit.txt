@@ -1,0 +1,443 @@
+-- Apartment Rental Database (PostgreSQL) - EXPLICIT FOREIGN KEY VERSION
+-- Drop statements for idempotency (development only)
+DROP TABLE IF EXISTS Property_Amenities CASCADE;
+DROP TABLE IF EXISTS Property_Images CASCADE;
+DROP TABLE IF EXISTS Nearby_Places CASCADE;
+DROP TABLE IF EXISTS User_Searches CASCADE;
+DROP TABLE IF EXISTS Saved_Properties CASCADE;
+DROP TABLE IF EXISTS Property_Visits CASCADE;
+DROP TABLE IF EXISTS Reviews_Ratings CASCADE;
+DROP TABLE IF EXISTS Property_Inquiries CASCADE;
+DROP TABLE IF EXISTS Listings CASCADE;
+DROP TABLE IF EXISTS Properties CASCADE;
+DROP TABLE IF EXISTS Furnishing_Types CASCADE;
+DROP TABLE IF EXISTS Amenities CASCADE;
+DROP TABLE IF EXISTS Property_Types CASCADE;
+DROP TABLE IF EXISTS Addresses CASCADE;
+DROP TABLE IF EXISTS Localities CASCADE;
+DROP TABLE IF EXISTS User_Preferences CASCADE;
+DROP TABLE IF EXISTS Users CASCADE;
+
+-- Addresses Table
+CREATE TABLE Addresses (
+    address_id SERIAL PRIMARY KEY,
+    street_address VARCHAR(255) NOT NULL,
+    apartment_number VARCHAR(20),
+    locality VARCHAR(100) NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    state VARCHAR(100) NOT NULL,
+    pincode VARCHAR(10) NOT NULL,
+    country VARCHAR(100) DEFAULT 'India',
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
+    landmark VARCHAR(255)
+);
+
+-- Localities Table
+CREATE TABLE Localities (
+    locality_id SERIAL PRIMARY KEY,
+    locality_name VARCHAR(100) NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    state VARCHAR(100) NOT NULL,
+    pincode VARCHAR(10),
+    area_type VARCHAR(20) CHECK (area_type IN ('residential', 'commercial', 'mixed')),
+    connectivity_rating SMALLINT CHECK (connectivity_rating >= 1 AND connectivity_rating <= 5),
+    safety_rating SMALLINT CHECK (safety_rating >= 1 AND safety_rating <= 5),
+    lifestyle_rating SMALLINT CHECK (lifestyle_rating >= 1 AND lifestyle_rating <= 5)
+);
+
+-- Users Table
+CREATE TABLE Users (
+    user_id SERIAL PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    phone_number VARCHAR(15) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    user_type VARCHAR(10) NOT NULL CHECK (user_type IN ('owner', 'tenant', 'both')),
+    profile_picture_url VARCHAR(500),
+    date_of_birth DATE,
+    gender VARCHAR(10) CHECK (gender IN ('male', 'female', 'other')),
+    occupation VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_verified BOOLEAN DEFAULT FALSE,
+    verification_token VARCHAR(255),
+    status VARCHAR(10) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended'))
+);
+
+-- User Preferences Table
+CREATE TABLE User_Preferences (
+    preference_id SERIAL PRIMARY KEY,
+    user_id INT UNIQUE NOT NULL,
+    preferred_locations JSON,
+    budget_min DECIMAL(10, 2),
+    budget_max DECIMAL(10, 2),
+    preferred_property_types JSON,
+    preferred_amenities JSON,
+    email_notifications BOOLEAN DEFAULT TRUE,
+    sms_notifications BOOLEAN DEFAULT TRUE,
+    push_notifications BOOLEAN DEFAULT TRUE,
+    
+    -- Explicit Foreign Key Constraint
+    CONSTRAINT fk_user_preferences_user_id 
+        FOREIGN KEY (user_id) 
+        REFERENCES Users(user_id) 
+        ON DELETE CASCADE
+);
+
+-- Property Types Table
+CREATE TABLE Property_Types (
+    type_id SERIAL PRIMARY KEY,
+    type_name VARCHAR(50) NOT NULL UNIQUE,
+    description TEXT
+);
+
+-- Furnishing Types Table
+CREATE TABLE Furnishing_Types (
+    furnishing_id SERIAL PRIMARY KEY,
+    furnishing_type VARCHAR(50) NOT NULL UNIQUE,
+    description TEXT
+);
+
+-- Amenities Table
+CREATE TABLE Amenities (
+    amenity_id SERIAL PRIMARY KEY,
+    amenity_name VARCHAR(100) NOT NULL UNIQUE,
+    category VARCHAR(50),
+    icon_url VARCHAR(500),
+    description TEXT
+);
+
+-- Properties Table
+CREATE TABLE Properties (
+    property_id SERIAL PRIMARY KEY,
+    owner_id INT NOT NULL,
+    property_type_id INT NOT NULL,
+    address_id INT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    bedrooms INT NOT NULL CHECK (bedrooms >= 0),
+    bathrooms INT NOT NULL CHECK (bathrooms >= 0),
+    total_area_sqft INT CHECK (total_area_sqft > 0),
+    carpet_area_sqft INT CHECK (carpet_area_sqft > 0),
+    floor_number INT,
+    total_floors INT CHECK (total_floors > 0),
+    age_of_property INT CHECK (age_of_property >= 0),
+    furnishing_id INT,
+    parking_available BOOLEAN DEFAULT FALSE,
+    parking_spaces INT DEFAULT 0 CHECK (parking_spaces >= 0),
+    balcony_count INT DEFAULT 0 CHECK (balcony_count >= 0),
+    construction_status VARCHAR(20) CHECK (construction_status IN ('ready_to_move', 'under_construction')),
+    facing_direction VARCHAR(20) CHECK (facing_direction IN ('north', 'south', 'east', 'west', 'north_east', 'north_west', 'south_east', 'south_west')),
+    preferred_tenant VARCHAR(20) CHECK (preferred_tenant IN ('family', 'bachelor_male', 'bachelor_female', 'company', 'any')),
+    available_from DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE,
+    
+    -- Explicit Foreign Key Constraints
+    CONSTRAINT fk_properties_owner_id 
+        FOREIGN KEY (owner_id) 
+        REFERENCES Users(user_id) 
+        ON DELETE SET NULL,
+        
+    CONSTRAINT fk_properties_property_type_id 
+        FOREIGN KEY (property_type_id) 
+        REFERENCES Property_Types(type_id) 
+        ON DELETE RESTRICT,
+        
+    CONSTRAINT fk_properties_address_id 
+        FOREIGN KEY (address_id) 
+        REFERENCES Addresses(address_id) 
+        ON DELETE CASCADE,
+        
+    CONSTRAINT fk_properties_furnishing_id 
+        FOREIGN KEY (furnishing_id) 
+        REFERENCES Furnishing_Types(furnishing_id) 
+        ON DELETE SET NULL
+);
+
+-- Listings Table
+CREATE TABLE Listings (
+    listing_id SERIAL PRIMARY KEY,
+    property_id INT NOT NULL,
+    monthly_rent DECIMAL(10, 2) NOT NULL CHECK (monthly_rent > 0),
+    security_deposit DECIMAL(10, 2) NOT NULL CHECK (security_deposit >= 0),
+    maintenance_charges DECIMAL(10, 2) DEFAULT 0 CHECK (maintenance_charges >= 0),
+    brokerage_fee DECIMAL(10, 2) DEFAULT 0 CHECK (brokerage_fee >= 0),
+    listing_type VARCHAR(10) CHECK (listing_type IN ('rent', 'sale')),
+    listing_status VARCHAR(20) DEFAULT 'active' CHECK (listing_status IN ('active', 'inactive', 'rented', 'sold')),
+    negotiable BOOLEAN DEFAULT TRUE,
+    immediately_available BOOLEAN DEFAULT TRUE,
+    listing_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expiry_date TIMESTAMP,
+    views_count INT DEFAULT 0 CHECK (views_count >= 0),
+    contact_count INT DEFAULT 0 CHECK (contact_count >= 0),
+    
+    -- Explicit Foreign Key Constraint
+    CONSTRAINT fk_listings_property_id 
+        FOREIGN KEY (property_id) 
+        REFERENCES Properties(property_id) 
+        ON DELETE CASCADE
+);
+
+-- Property Images Table
+CREATE TABLE Property_Images (
+    image_id SERIAL PRIMARY KEY,
+    property_id INT NOT NULL,
+    image_url VARCHAR(500) NOT NULL,
+    image_type VARCHAR(50) NOT NULL CHECK (image_type IN ('main', 'bedroom', 'bathroom', 'kitchen', 'living_room', 'balcony', 'exterior', 'floor_plan')),
+    image_order INT DEFAULT 0 CHECK (image_order >= 0),
+    caption VARCHAR(255),
+    is_primary BOOLEAN DEFAULT FALSE,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    file_size INT CHECK (file_size > 0),
+    dimensions VARCHAR(20),
+    
+    -- Explicit Foreign Key Constraint
+    CONSTRAINT fk_property_images_property_id 
+        FOREIGN KEY (property_id) 
+        REFERENCES Properties(property_id) 
+        ON DELETE CASCADE
+);
+
+-- Property Amenities Table (Many-to-Many Junction Table)
+CREATE TABLE Property_Amenities (
+    property_amenity_id SERIAL PRIMARY KEY,
+    property_id INT NOT NULL,
+    amenity_id INT NOT NULL,
+    available BOOLEAN DEFAULT TRUE,
+    
+    -- Composite Unique Constraint (prevents duplicates)
+    CONSTRAINT uk_property_amenities_property_amenity 
+        UNIQUE(property_id, amenity_id),
+    
+    -- Explicit Foreign Key Constraints
+    CONSTRAINT fk_property_amenities_property_id 
+        FOREIGN KEY (property_id) 
+        REFERENCES Properties(property_id) 
+        ON DELETE CASCADE,
+        
+    CONSTRAINT fk_property_amenities_amenity_id 
+        FOREIGN KEY (amenity_id) 
+        REFERENCES Amenities(amenity_id) 
+        ON DELETE CASCADE
+);
+
+-- Property Inquiries Table
+CREATE TABLE Property_Inquiries (
+    inquiry_id SERIAL PRIMARY KEY,
+    property_id INT NOT NULL,
+    listing_id INT NOT NULL,
+    inquirer_id INT NOT NULL,
+    inquiry_type VARCHAR(20) CHECK (inquiry_type IN ('call', 'message', 'visit_request', 'general')),
+    message TEXT,
+    preferred_contact_time VARCHAR(50),
+    inquiry_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'responded', 'closed')),
+    owner_response TEXT,
+    response_date TIMESTAMP,
+    
+    -- Explicit Foreign Key Constraints
+    CONSTRAINT fk_property_inquiries_property_id 
+        FOREIGN KEY (property_id) 
+        REFERENCES Properties(property_id) 
+        ON DELETE CASCADE,
+        
+    CONSTRAINT fk_property_inquiries_listing_id 
+        FOREIGN KEY (listing_id) 
+        REFERENCES Listings(listing_id) 
+        ON DELETE CASCADE,
+        
+    CONSTRAINT fk_property_inquiries_inquirer_id 
+        FOREIGN KEY (inquirer_id) 
+        REFERENCES Users(user_id) 
+        ON DELETE CASCADE
+);
+
+-- Saved Properties Table (Many-to-Many Junction Table)
+CREATE TABLE Saved_Properties (
+    saved_id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,
+    property_id INT NOT NULL,
+    saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT,
+    
+    -- Composite Unique Constraint (prevents duplicate saves)
+    CONSTRAINT uk_saved_properties_user_property 
+        UNIQUE(user_id, property_id),
+    
+    -- Explicit Foreign Key Constraints
+    CONSTRAINT fk_saved_properties_user_id 
+        FOREIGN KEY (user_id) 
+        REFERENCES Users(user_id) 
+        ON DELETE CASCADE,
+        
+    CONSTRAINT fk_saved_properties_property_id 
+        FOREIGN KEY (property_id) 
+        REFERENCES Properties(property_id) 
+        ON DELETE CASCADE
+);
+
+-- User Searches Table
+CREATE TABLE User_Searches (
+    search_id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,
+    location VARCHAR(255),
+    min_rent DECIMAL(10, 2) CHECK (min_rent >= 0),
+    max_rent DECIMAL(10, 2) CHECK (max_rent >= 0),
+    bedrooms INT CHECK (bedrooms >= 0),
+    property_type_id INT,
+    furnishing_id INT,
+    search_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    search_query JSON,
+    
+    -- Check constraint to ensure min_rent <= max_rent
+    CONSTRAINT chk_user_searches_rent_range 
+        CHECK (min_rent IS NULL OR max_rent IS NULL OR min_rent <= max_rent),
+    
+    -- Explicit Foreign Key Constraints
+    CONSTRAINT fk_user_searches_user_id 
+        FOREIGN KEY (user_id) 
+        REFERENCES Users(user_id) 
+        ON DELETE CASCADE,
+        
+    CONSTRAINT fk_user_searches_property_type_id 
+        FOREIGN KEY (property_type_id) 
+        REFERENCES Property_Types(type_id) 
+        ON DELETE SET NULL,
+        
+    CONSTRAINT fk_user_searches_furnishing_id 
+        FOREIGN KEY (furnishing_id) 
+        REFERENCES Furnishing_Types(furnishing_id) 
+        ON DELETE SET NULL
+);
+
+-- Reviews and Ratings Table
+CREATE TABLE Reviews_Ratings (
+    review_id SERIAL PRIMARY KEY,
+    property_id INT NOT NULL,
+    reviewer_id INT NOT NULL,
+    rating SMALLINT CHECK (rating >= 1 AND rating <= 5),
+    review_text TEXT,
+    review_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_verified BOOLEAN DEFAULT FALSE,
+    helpful_count INT DEFAULT 0 CHECK (helpful_count >= 0),
+    
+    -- Explicit Foreign Key Constraints
+    CONSTRAINT fk_reviews_ratings_property_id 
+        FOREIGN KEY (property_id) 
+        REFERENCES Properties(property_id) 
+        ON DELETE CASCADE,
+        
+    CONSTRAINT fk_reviews_ratings_reviewer_id 
+        FOREIGN KEY (reviewer_id) 
+        REFERENCES Users(user_id) 
+        ON DELETE CASCADE
+);
+
+-- Property Visits Table
+CREATE TABLE Property_Visits (
+    visit_id SERIAL PRIMARY KEY,
+    property_id INT NOT NULL,
+    visitor_id INT NOT NULL,
+    visit_date DATE NOT NULL,
+    visit_time TIME NOT NULL,
+    status VARCHAR(20) DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'cancelled', 'no_show')),
+    notes TEXT,
+    scheduled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Explicit Foreign Key Constraints
+    CONSTRAINT fk_property_visits_property_id 
+        FOREIGN KEY (property_id) 
+        REFERENCES Properties(property_id) 
+        ON DELETE CASCADE,
+        
+    CONSTRAINT fk_property_visits_visitor_id 
+        FOREIGN KEY (visitor_id) 
+        REFERENCES Users(user_id) 
+        ON DELETE CASCADE
+);
+
+-- Nearby Places Table
+CREATE TABLE Nearby_Places (
+    place_id SERIAL PRIMARY KEY,
+    property_id INT NOT NULL,
+    place_type VARCHAR(30) CHECK (place_type IN ('metro_station', 'bus_stop', 'hospital', 'school', 'mall', 'market', 'restaurant', 'atm', 'gym')),
+    place_name VARCHAR(200) NOT NULL,
+    distance_km DECIMAL(5, 2) CHECK (distance_km >= 0),
+    walk_time_minutes INT CHECK (walk_time_minutes >= 0),
+    
+    -- Explicit Foreign Key Constraint
+    CONSTRAINT fk_nearby_places_property_id 
+        FOREIGN KEY (property_id) 
+        REFERENCES Properties(property_id) 
+        ON DELETE CASCADE
+);
+
+-- Performance Indexes
+CREATE INDEX idx_properties_owner_id ON Properties(owner_id);
+CREATE INDEX idx_properties_address_id ON Properties(address_id);
+CREATE INDEX idx_properties_type_id ON Properties(property_type_id);
+CREATE INDEX idx_properties_furnishing_id ON Properties(furnishing_id);
+CREATE INDEX idx_property_images_property_id ON Property_Images(property_id);
+CREATE INDEX idx_property_inquiries_property_id_inquirer_id ON Property_Inquiries(property_id, inquirer_id);
+CREATE INDEX idx_saved_properties_user_id_property_id ON Saved_Properties(user_id, property_id);
+CREATE INDEX idx_property_amenities_property_id_amenity_id ON Property_Amenities(property_id, amenity_id);
+CREATE INDEX idx_user_searches_user_id_search_date ON User_Searches(user_id, search_date);
+CREATE INDEX idx_listings_property_id ON Listings(property_id);
+CREATE INDEX idx_listings_status ON Listings(listing_status);
+CREATE INDEX idx_reviews_ratings_property_id ON Reviews_Ratings(property_id);
+CREATE INDEX idx_property_visits_property_id ON Property_Visits(property_id);
+CREATE INDEX idx_nearby_places_property_id ON Nearby_Places(property_id);
+
+-- Additional composite indexes for common query patterns
+CREATE INDEX idx_properties_location_type ON Properties(property_type_id, is_active);
+CREATE INDEX idx_listings_rent_range ON Listings(monthly_rent, listing_status);
+CREATE INDEX idx_properties_bedrooms_active ON Properties(bedrooms, is_active);
+
+-- Trigger for updating updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Apply the trigger to relevant tables
+CREATE TRIGGER update_properties_updated_at 
+    BEFORE UPDATE ON Properties 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Insert sample data for Property Types
+INSERT INTO Property_Types (type_name, description) VALUES 
+('Apartment', '1-4 BHK apartments in residential complexes'),
+('Villa', 'Independent villas with private gardens'),
+('Studio', 'Single room apartments with kitchenette'),
+('PG', 'Paying guest accommodations with shared facilities'),
+('House', 'Independent houses'),
+('Penthouse', 'Premium apartments on top floors');
+
+-- Insert sample data for Furnishing Types
+INSERT INTO Furnishing_Types (furnishing_type, description) VALUES 
+('Fully Furnished', 'Complete furniture and appliances provided'),
+('Semi Furnished', 'Basic furniture like beds, wardrobes provided'),
+('Unfurnished', 'No furniture provided, only fixtures');
+
+-- Insert sample amenities
+INSERT INTO Amenities (amenity_name, category, description) VALUES 
+('Swimming Pool', 'Recreation', 'Swimming pool facility'),
+('Gym', 'Fitness', 'Fitness center with equipment'),
+('Security', 'Safety', '24/7 security service'),
+('Elevator', 'Convenience', 'Lift facility'),
+('Parking', 'Parking', 'Dedicated parking space'),
+('Power Backup', 'Utilities', 'Generator backup during power cuts'),
+('Water Supply', 'Utilities', '24/7 water supply'),
+('Wi-Fi', 'Connectivity', 'Internet connectivity'),
+('AC', 'Comfort', 'Air conditioning'),
+('Balcony', 'Space', 'Private balcony'),
+('Garden', 'Recreation', 'Common garden area'),
+('Playground', 'Recreation', 'Children play area');
