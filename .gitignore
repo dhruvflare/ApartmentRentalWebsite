@@ -1,0 +1,51 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Django stuff:
+db.sqlite3
+*.log
+local_settings.py
+.env
+media/
+staticfiles/
+*.pot
+
+# If using PostgreSQL locally
+*.pgdata
+
+# Virtualenvs
+venv/
+env/
+ENV/
+.virtualenv/
+
+# IDE settings
+.idea/
+
+# macOS metadata
+.DS_Store
+
+# Windows metadata
+Thumbs.db
+
+# Coverage reports
+.coverage
+
+# Test environments
+.tox/
+.eggs/
+
+# Build output
+build/
+dist/
+*.egg-info/
+
+# Migrations (usually keep these unless you specifically want to ignore temporary/test migrations)
+# Uncomment if you wish:
+# */migrations/*.pyc
+# */migrations/__pycache__/
