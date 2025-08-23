@@ -1,9 +1,9 @@
-# models.py - Apartment Rental Django Models
+# models.py - Apartment Rental Django Models (FIXED)
 
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.contrib.postgres.fields import JSONField
+from django.db.models import JSONField  # FIXED: Updated import
 from django.utils import timezone
 
 
